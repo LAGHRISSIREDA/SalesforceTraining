@@ -2,27 +2,57 @@ trigger ContactTrigger on Contact (after insert,after update,after delete,after 
 
     switch on Trigger.operationType {
         when  AFTER_INSERT{
-            List<Account> listAccounts = new List<Account>();
-            for(Contact ctn : Trigger.new){
-                if(String.isNotBlank(ctn.accountId)){
-                    String accountd = ctn.accountId;
-                    List<AggregateResult> results = [SELECT AccountId,count(id) totalContacts 
-                                                     FROM Contact 
-                                                     WHERE active__c = TRUE
-                                                     AND AccountId = :accountd 
-                                                     GROUP BY AccountId];
-                    for(AggregateResult ct :results ){
-                        String acctId = String.valueOf(ct.get('AccountId'));
-                        Integer totalContact = Integer.valueOf(ct.get('totalcontacts'));
-                        listAccounts.add(new Account(id = acctId,Active_Contacts__c=totalContact));
-                    }
-                    update listAccounts;
+            Set<Id> accountIds = new SET<Id>();
+            for(Contact con : Trigger.new){
+                if(String.isNotBlank(con.AccountId)){
+                    accountIds.add(con.AccountId);
                 }
-                
-
             }
+
+            //list Aggregate contact for all account
+
+            List<AggregateResult> results = [SELECT accountId,count(id) totalContacts
+                                            FROM Contact
+                                            WHERE active__c = TRUE
+                                            AND accountId IN :accountIds
+                                            GROUP BY accountId];
+
+            List<Account> listAccounts = new List<Account>();
+            for(AggregateResult con:results){
+                String accId = String.valueOf(con.get('AccountId'));
+                Integer totalcontacts = Integer.valueOf(con.get('totalContacts'));
+                listAccounts.add(new Account(id=accId,Active_Contacts__c=totalcontacts));
+            }
+            update listAccounts;
             
         }
+        when  AFTER_UPDATE{
+
+               Set<Id> accountIds = new SET<Id>();
+                for(Contact con : Trigger.new){
+                    if(String.isNotBlank(con.AccountId) && Trigger.oldMap.get(con.Id).active__c != con.active__c){
+                        accountIds.add(con.AccountId);
+                    }
+                }
+
+                //list Aggregate contact for all account
+
+                List<AggregateResult> results = [SELECT accountId,count(id) totalContacts
+                                                FROM Contact
+                                                WHERE active__c = TRUE
+                                                AND accountId IN :accountIds
+                                                GROUP BY accountId];
+
+                List<Account> listAccounts = new List<Account>();
+                for(AggregateResult con:results){
+                    String accId = String.valueOf(con.get('AccountId'));
+                    Integer totalcontacts = Integer.valueOf(con.get('totalContacts'));
+                    listAccounts.add(new Account(id=accId,Active_Contacts__c=totalcontacts));
+                }
+                update listAccounts;
+
+        }
+      
        
     }
     
